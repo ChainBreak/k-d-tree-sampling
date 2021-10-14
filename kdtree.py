@@ -9,6 +9,7 @@ class KdTree():
         dim_max_list = [dim_range[1] for dim_range in dim_ranges]
         
         self.max_depth = 0
+        self.node_count = 0
 
         self.root_node = KdNode(
             tree=self,
@@ -42,6 +43,7 @@ class KdNode():
 
         # Update the root tree max depth 
         self.tree.max_depth = max(self.tree.max_depth, self.depth)
+        self.tree.node_count += 1
 
         # get the dimension this node will split.
         # Just roll through the dimensions from each depth
@@ -88,6 +90,8 @@ class KdNode():
 
             self.mode = KdNode.SPLIT
 
+            self.create_children_nodes()
+
             # We need to move our data down to our left or right child node
             child_node = self.get_left_or_right_child_node(self.x)
             child_node.add(self.x,self.value)
@@ -104,6 +108,28 @@ class KdNode():
             child_node = self.get_left_or_right_child_node(x)
             child_node.add(x,value)
 
+    def create_children_nodes(self):
+
+        new_dim_max_list = self.dim_max_list.copy()
+        new_dim_max_list[self.dim] = self.mid_point
+        
+        self.left_node = KdNode(
+            tree=self.tree,
+            dim_min_list=self.dim_min_list,
+            dim_max_list=new_dim_max_list,
+            depth=self.depth + 1,
+            )
+
+        new_dim_min_list = self.dim_min_list.copy()
+        new_dim_min_list[self.dim] = self.mid_point
+
+        self.right_node = KdNode(
+            tree=self.tree,
+            dim_min_list=new_dim_min_list,
+            dim_max_list=self.dim_max_list,
+            depth=self.depth + 1,
+            )
+
 
     def get_left_or_right_child_node(self,x):
         # Uses the mid point of the currect dimension to 
@@ -113,46 +139,31 @@ class KdNode():
         dim_value = x[self.dim]
 
         if dim_value < self.mid_point:
-            # Create and or return the left node
-            if self.left_node is None:
-                new_dim_max_list = self.dim_max_list.copy()
-                new_dim_max_list[self.dim] = self.mid_point
-                self.left_node = KdNode(
-                    tree=self.tree,
-                    dim_min_list=self.dim_min_list,
-                    dim_max_list=new_dim_max_list,
-                    depth=self.depth + 1,
-                    )
             return self.left_node
-
         else:
-
-            # Create and or return the right node
-            if self.right_node is None:
-                new_dim_min_list = self.dim_min_list.copy()
-                new_dim_min_list[self.dim] = self.mid_point
-                self.right_node = KdNode(
-                    tree=self.tree,
-                    dim_min_list=new_dim_min_list,
-                    dim_max_list=self.dim_max_list,
-                    depth=self.depth + 1,
-                    )
             return self.right_node
 
+
     def sample(self):
+        # If the node has no children. Just sample unifomly within its region
         if self.mode == KdNode.EMPTY or self.mode == KdNode.DATA:
             x = [random.uniform(dim_min, dim_max) for dim_min,dim_max in zip(self.dim_min_list,self.dim_max_list)]
             return x
 
-        have_both_children = self.left_node is not None and self.right_node is not None
+        # If it has children. Randomly chose a child based on the relative expected value
+        else:
+            if self.left_node.count > 0 and self.right_node.count >0:
+                # Get the expected values for choosing left or right child
+                left_expected_value = self.left_node.expected_value
+                right_expected_value = self.right_node.expected_value
 
-        if have_both_children:
-            left_expected_value = self.left_node.expected_value
-            right_expected_value = self.right_node.expected_value
-
-            left_prob = left_expected_value / (left_expected_value + right_expected_value)
-            
-            if random.random() < left_prob:
+                # Create a probability threshold based on the relative expected values
+                prob = left_expected_value / (left_expected_value + right_expected_value)
+            else:
+                prob = 0.5
+                
+            # Sample a random number then recurse down the tree
+            if random.random() < prob:
                 return self.left_node.sample()
             else:
                 return self.right_node.sample()

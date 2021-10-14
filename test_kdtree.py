@@ -1,5 +1,6 @@
 import pytest
 import numpy as np
+import math
 from kdtree import KdTree
 
 def test_root_node():
@@ -111,6 +112,49 @@ def test_sample_2x2():
     rl = r.left_node
     rr = r.right_node
 
-    assert len(ll.sample()) == 2
     assert len(model.sample()) == 2
+
+
+def test_circle_ratio():
+
+    def in_circle(x):
+        x,y = x
+        cx ,cy = 5.,5.
+
+        d = math.sqrt( (x-cx)**2 + (y-cy)**2 )
+
+        return d < 2.0
+
+    def value_function(x):
+        if in_circle(x):
+            return 10
+        else:
+            return 1
     
+
+    model = KdTree(dim_ranges=[
+        [0,10], # x range
+        [0,10], # y range
+        ])
+
+    for i in range(100):
+        x = model.sample()
+        value = value_function(x)
+
+        model.add(x,value)
+
+    in_count = 0
+    out_count = 0
+    for i in range(100):
+        x = model.sample() 
+        if in_circle(x):
+            in_count += 1
+        else:
+            out_count += 1
+
+    print(model.root_node.expected_value)
+    print(in_count,out_count)
+    print(in_count / (in_count+out_count))
+
+    print(model.max_depth)
+    print(model.node_count)
